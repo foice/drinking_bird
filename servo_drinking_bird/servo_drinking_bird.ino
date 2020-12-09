@@ -15,6 +15,8 @@
 #define ServoPin 14   //D5 is GPIO14
 
 
+int max_angle = 1; // the value that I control from the web interface
+int min_angle = 6; // the value that I control from the web interface
 
 
 
@@ -35,27 +37,29 @@ void handleServo(){
   Serial.print("=?=");
   Serial.println(pos);
   digitalWrite(LED,!(digitalRead(LED))); //Toggle LED
-  server.send(200, "text/plane","");
+  server.send(200, "text/html", "new position:"+String(pos) );
 }
 
-//void HThandleRoot(char* apssid) {                         // When URI / is requested, send a web page with a button to perform the actions
-//  
-//  String download_string="<form method=\"get\" action=\"temp.csv\" download><button type=\"submit\">Download temp.csv</button></form>";
-//  String clear_string="<form method=\"GET\" action=\"clear\"><input type=\"submit\" value=\"Clear temp.csv\"></form>";
-//  String list_of_files=listAllFilesNameSize();
-//  char* title = apssid ;
-//  //sprintf(title,"<h1> %s </h1>",apssid);
-//  String _title;
-//  _title = "<h1>"+String(title)+"</h1>";
-//
-//  String string_subnet =  String(subnet);
-//  String sub_title = "<h2>Also available on private subnet: "+  string_subnet +"</h2>";
-//  String flashing_notice = "This device flashes for " + String(flash_duration) + " milliseconds";
-//  String form="<br><form action=\"/setting\"> Update frequency (ms): <input type=\"text\" name=\"frequency\" value=\"" + String(update_frequency) + "\">  <input type=\"submit\" value=\"Submit\"><br>";
-//  String form2="LED flash duration (ms): <input type=\"text\" name=\"flash\" value=\"" + String(flash_duration) + "\">  <input type=\"submit\" value=\"Submit\"></form><br>";
-//
-//  server.send(200, "text/html", _title+sub_title+flashing_notice+"<h3>Actions</h3>"+download_string+" "+clear_string+"<br>"+"<h3>Files</h3>"+list_of_files+form+form2);
-//}
+
+void handleSetting()
+{ // If a POST request is made to URI /clear
+  String value;
+  value = server.arg("minValue");
+  Serial.println("handleSetting(" + value + ")");
+  Serial.println("min_angle: " + String(min_angle));
+  min_angle = value.toInt(); // string to integer
+  Serial.println("min_angle: " + String(min_angle));
+
+  value = server.arg("maxValue");
+  Serial.println("handleSetting(" + value + ")");
+  Serial.println("max_value: " + String(max_angle));
+  max_angle = value.toInt(); // atof?
+  Serial.println("max_angle: " + String(max_angle));
+
+  server.send(200, "text/html", "New min_angle: " + String(min_angle) + " .<br> " + "New max_angle: " + String(max_angle) + " .");
+  // will use `value` to update the parameter I want to change
+  //return true;
+}
 
 
 
@@ -63,9 +67,14 @@ void handleSimpleRoot() {
   int read_pos = myservo.read();
   String _title = "<h1>Servo Server</h1>";
   String sub_title = "<h2>Currently turned at: "+ String(read_pos)  +"</h2>";
-  String form="<br><form action=\"/setPOS\"> Update position (0-300?): <input type=\"text\" name=\"servoPOS\" value=\"" + String(read_pos) + "\">  <input type=\"submit\" value=\"Submit\"><br>";
+  String range = "<h3>Current range: "+ String(min_angle) +","+ String(max_angle) +"</h3>";
+  //String form="<br><form action=\"/setPOS\"> Update position (0-300?):<input type=\"text\" name=\"servoPOS\" value=\"" + String(read_pos) + "\">  <input type=\"submit\" value=\"Submit\"><br></form>";
+  String open_form  = "<br><form action=\"/setting\">";
+  String max_value  = "Min position: <input type=\"text\" name=\"minValue\" value=\"" + String(min_angle) + "\">  <input type=\"submit\" value=\"Submit\"><br>";
+  String min_value  = "Max position: <input type=\"text\" name=\"maxValue\" value=\"" + String(max_angle) + "\">  <input type=\"submit\" value=\"Submit\"><br>";
+  String close_form = "</form><br>";
 
-String myHTML= _title+ sub_title+form ;
+  String myHTML= _title+sub_title+range+open_form+max_value+min_value+close_form ;
   
  server.send(200, "text/html", myHTML); //Send web page
 }
@@ -73,24 +82,8 @@ String myHTML= _title+ sub_title+form ;
 
 
 void handleDevelRoot() {
-//  const char INDEX[] = R"***(
-//<!DOCTYPE html>
-//<html>
-//<head>
-//<title>ESP8266 Servo | Circuits4you.com</title>
-//<meta name="viewport" content="width=device-width, initial-scale=1">
-//</head>
-//<style>
-// 
-//<body>
-//
-//<p> I am a paragraph</p>
-//</body>
-//</html>
-//)***";
   String myHTML= par ;
- 
- server.send(200, "text/html", myHTML); //Send web page
+  server.send(200, "text/html", myHTML); //Send web page
 }
 
 
@@ -106,7 +99,6 @@ void handleDevelRoot() {
 //  // will use `value` to update the parameter I want to change
 //  //return true;
 //}
-
 
 
 //================================================
@@ -132,7 +124,7 @@ void setup() {
 
   //If connection successful show IP address in serial monitor
   Serial.println("");
-  Serial.print("Connected to ");
+  Serial.print("Connected to ");  
   Serial.println(ssid);
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());  //IP address assigned to your ESP
@@ -140,10 +132,10 @@ void setup() {
   //Initialize Webserver
   server.on("/",handleSimpleRoot);
   server.on("/devel",handleDevelRoot);
-  //server.on("/setting", HTTP_GET, handleSetting);
+  server.on("/setting", HTTP_GET, handleSetting);
   server.on("/setPOS",handleServo); //Sets servo position from Web request
   server.begin();  
-  Serial.println("*** HTTP server started.");
+  Serial.println("*** HTTP server started.***");
 
 }
 
@@ -151,12 +143,13 @@ void setup() {
 //     LOOP
 //================================================
 void loop() {
-   server.handleClient();
-  
-   long randNumber = random(10, 30);
-   myservo.write(randNumber);
-   delay(2000);
 
+   delay(2000);
+   //long randNumber = random(10, 30);
+   myservo.write(min_angle);
+   delay(2000);
+   myservo.write(max_angle);
+   server.handleClient();
  
 }
 //================================================
